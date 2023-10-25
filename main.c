@@ -1,110 +1,71 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include "list.h"
 #include <string.h>
-#include <pthread.h>
-#include <arpa/inet.h> 
-#include <netdb.h>
+#include <arpa/inet.h>
 #include <unistd.h>
+#include <netdb.h>
 
 #define MAXBUFF 1024
 
-//Synchronization 
-pthread_mutex_t syncLocalMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t syncLocalCond;
+int main(int argc, char *argv[]) {
+    if (argc != 4) {
+        printf("Usage: %s <local_port> <remote_machine_name> <remote_port>\n", argv[0]);
+        exit(1);
+    }
 
-pthread_mutex_t syncRemoteMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t syncRemoteCond;
-
-pthread_t threads[4];
-
-struct sockaddr_in localSin, remoteSin;
-
-char *HOSTNAME;
-
-int socketDescriptor;
-
-bool CHATTING = true;
-
-void* receiveMessages(void* arg) {
-    char msg[MAXBUFF];
+    int socketDescriptor;
+    struct sockaddr_in remoteSin, localSin;
     socklen_t fromlen = sizeof(remoteSin);
+    char *remoteHostName = argv[2];
+    char *remotePort = argv[3];
 
-    while (CHATTING) {
-        recvfrom(socketDescriptor, msg, MAXBUFF, 0, (struct sockaddr*)&remoteSin, &fromlen);
-        printf("Partner: %s", msg);
-    }
-
-    return NULL;
-}
-
-
-
-int main(int argc, char *argv[]){
-    /*
-    argv[1] = local port
-    argv[2] = remote machine name
-    argv[3] = remote port
-    */
-    HOSTNAME = argv[2];
-
-    if (argc != 4){
-        printf("Insufficient arguments give.\n");
-        exit(1);
-    }
-
-    printf("Creating socket....\n");
+    // Create a socket
     socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
-
-    if (socketDescriptor == -1){
-        printf("Failed to create socket\n");
+    if (socketDescriptor == -1) {
+        perror("Failed to create socket");
         exit(1);
     }
-    printf("socket created\n\n");
 
-    //local socket setup
+    // Setup local address
     localSin.sin_family = AF_INET;
     localSin.sin_port = htons(atoi(argv[1]));
     localSin.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    //remote socket setup
-    remoteSin.sin_family = AF_INET;
-    remoteSin.sin_port = htons(atoi(argv[3]));
-
-    printf("Binding...\n");
-    if(bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(struct sockaddr_in)) == -1){
-        printf("Failed to bind socket\n");
+    // Bind to the local address
+    if (bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(localSin)) == -1) {
+        perror("Failed to bind socket");
         exit(1);
     }
-    printf("Binding succesfull\n\n");
 
-    //search for host name
-    printf("Looking for %s...\n", HOSTNAME);
-    if(!gethostbyname(HOSTNAME)){
+    // Get the remote host information
+    struct addrinfo hints, *result;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    if (getaddrinfo(remoteHostName, remotePort, &hints, &result) != 0) {
         printf("Could not find host\n");
-    }
-    printf("Host found\n\n");
-
-     pthread_t receiveThread;
-
-    // Create a thread to receive messages
-    if (pthread_create(&receiveThread, NULL, receiveMessages, NULL) != 0) {
-        perror("Failed to create receive thread");
         exit(1);
     }
 
-    char msg[MAXBUFF];
+    // Setup remote address
+    memcpy(&remoteSin, result->ai_addr, result->ai_addrlen);
 
+    char message[MAXBUFF];
 
-    while (CHATTING) {
-        fgets(msg, MAXBUFF, stdin);
+    while (1) {
+        printf("Type a message: ");
+        fgets(message, MAXBUFF, stdin);
 
         // Send the message to the remote host
-        sendto(socketDescriptor, msg, MAXBUFF, 0, (struct sockaddr*)&remoteSin, sizeof(struct sockaddr_in));
+        sendto(socketDescriptor, message, strlen(message), 0, (struct sockaddr *)&remoteSin, sizeof(remoteSin));
+
+        // Receive a message from the remote host
+        recvfrom(socketDescriptor, message, MAXBUFF, 0, (struct sockaddr *)&remoteSin, &fromlen);
+
+        printf("Received: %s", message);
     }
 
-        pthread_join(receiveThread, NULL);
     close(socketDescriptor);
 
     return 0;
