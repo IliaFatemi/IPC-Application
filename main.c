@@ -27,6 +27,18 @@ int socketDescriptor;
 
 bool CHATTING = true;
 
+void* receiveMessages(void* arg) {
+    char msg[MAXBUFF];
+    socklen_t fromlen = sizeof(remoteSin);
+
+    while (CHATTING) {
+        recvfrom(socketDescriptor, msg, MAXBUFF, 0, (struct sockaddr*)&remoteSin, &fromlen);
+        printf("Partner: %s", msg);
+    }
+
+    return NULL;
+}
+
 
 
 int main(int argc, char *argv[]){
@@ -72,19 +84,28 @@ int main(int argc, char *argv[]){
     if(!gethostbyname(HOSTNAME)){
         printf("Could not find host\n");
     }
-    printf("Host found\n");
+    printf("Host found\n\n");
+
+     pthread_t receiveThread;
+
+    // Create a thread to receive messages
+    if (pthread_create(&receiveThread, NULL, receiveMessages, NULL) != 0) {
+        perror("Failed to create receive thread");
+        exit(1);
+    }
 
     char msg[MAXBUFF];
-    char temp[MAXBUFF];
 
-    while(CHATTING){
-        fgets(msg,MAXBUFF,stdin);
-        strcpy(temp,(char*) msg);
-        sendto(socketDescriptor, temp,MAXBUFF,0,(struct sockaddr *)&remoteSin, sizeof(struct sockaddr_in));
-        socklen_t fromlen = sizeof(remoteSin);
-        recvfrom(socketDescriptor,msg,MAXBUFF,0,(struct sockaddr*)&remoteSin,&fromlen);
-        printf("Partner: %s",msg);
+
+    while (CHATTING) {
+        fgets(msg, MAXBUFF, stdin);
+
+        // Send the message to the remote host
+        sendto(socketDescriptor, msg, MAXBUFF, 0, (struct sockaddr*)&remoteSin, sizeof(struct sockaddr_in));
     }
+
+        pthread_join(receiveThread, NULL);
+    close(socketDescriptor);
 
     return 0;
 }
