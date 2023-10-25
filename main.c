@@ -1,81 +1,90 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include "list.h"
 #include <string.h>
+#include <pthread.h>
+#include <arpa/inet.h> 
+#include <netdb.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 
-#define MAX_MSG_LEN 1024
-#define END_CHAT_MARKER "!\n"
+#define MAXBUFF 1024
 
-void communicate(int sockfd) {
-    char message[MAX_MSG_LEN];
-    
-    while (1) {
-        // Read message from user
-        fgets(message, MAX_MSG_LEN, stdin);
-        
-        // Check if the message is the end marker
-        if (strcmp(message, END_CHAT_MARKER) == 0) {
-            printf("Chat ended.\n");
-            break;
-        }
-        
-        // Send message to the other user
-        send(sockfd, message, strlen(message), 0);
-        
-        // Receive message from the other user
-        int bytes_received = recv(sockfd, message, MAX_MSG_LEN, 0);
-        if (bytes_received <= 0) {
-            printf("Connection closed.\n");
-            break;
-        }
-        
-        // Null-terminate the received message
-        message[bytes_received] = '\0';
-        
-        // Print the received message
-        printf("Received: %s", message);
-    }
-}
+//Synchronization 
+pthread_mutex_t syncLocalMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t syncLocalCond;
+
+pthread_mutex_t syncRemoteMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t syncRemoteCond;
+
+pthread_t threads[4];
+
+struct sockaddr_in localSin, remoteSin;
+
+char *HOSTNAME;
+
+int socketDescriptor;
+
+bool CHATTING = true;
 
 
-int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s [my port number] [remote machine name] [remote port number]\n", argv[0]);
-        exit(1);
-    }
-    
-    int my_port = atoi(argv[1]);
-    char* remote_machine = argv[2];
-    int remote_port = atoi(argv[3]);
-    
-    // Create a socket
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
-        perror("Socket creation failed");
+
+int main(int argc, char *argv[]){
+    /*
+    argv[1] = local port
+    argv[2] = remote machine name
+    argv[3] = remote port
+    */
+    HOSTNAME = argv[2];
+
+    if (argc != 4){
+        printf("Insufficient arguments give.\n");
         exit(1);
     }
 
-    // Set up the server address structure
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(remote_port);
-    server_addr.sin_addr.s_addr = inet_addr(remote_machine);
+    printf("Creating socket....\n");
+    socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
 
-    // Connect to the remote machine
-    if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-        perror("Connection failed");
+    if (socketDescriptor == -1){
+        printf("Failed to create socket\n");
         exit(1);
     }
+    printf("socket created\n\n");
 
-    printf("Connected to %s:%d\n", remote_machine, remote_port);
+    //local socket setup
+    localSin.sin_family = AF_INET;
+    localSin.sin_port = htons(atoi(argv[1]));
+    localSin.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    // Start the chat
-    communicate(sockfd);
+    //remote socket setup
+    remoteSin.sin_family = AF_INET;
+    remoteSin.sin_port = htons(atoi(argv[3]));
 
-    // Close the socket
-    close(sockfd);
+    printf("Binding...\n");
+    if(bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(struct sockaddr_in)) == -1){
+        printf("Failed to bind socket\n");
+        exit(1);
+    }
+    printf("Binding succesfull\n\n");
+
+    //search for host name
+    printf("Looking for %s...\n", HOSTNAME);
+    if(!gethostbyname(HOSTNAME)){
+        printf("Could not find host\n");
+    }
+    printf("Host found\n");
+
+    char msg[MAXBUFF];
+    char temp[MAXBUFF];
+
+    while(CHATTING){
+        fgets(msg,MAXBUFF,stdin);
+        strcpy(temp,(char*) msg);
+        sendto(socketDescriptor, temp,MAXBUFF,0,(struct sockaddr *)&remoteSin, sizeof(struct sockaddr_in));
+        socklen_t fromlen = sizeof(remoteSin);
+        recvfrom(socketDescriptor,msg,MAXBUFF,0,(struct sockaddr*)&remoteSin,&fromlen);
+        printf("Partner: %s",msg);
+    }
 
     return 0;
 }
