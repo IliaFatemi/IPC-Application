@@ -1,9 +1,20 @@
+
+
+CC = gcc
 CFLAGS := -Werror -Wfatal-errors -g
+LDFLAGS =
 
-all: main
+SRC = main.c sTalkFunctions.c
+OBJ = list.o $(SRC:.c=.o)
+EXECUTABLE = s-talk
 
-main: main.c
-	gcc $(CFLAGS) -o s-talk main.c sTalkFunctions.c list.o
+all: $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJ)
+	$(CC) $(LDFLAGS) -o $@ $^
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f s-talk s-talk.o
+	rm -f $(filter-out list.o, $(OBJ)) $(EXECUTABLE)
