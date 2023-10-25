@@ -4,8 +4,22 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <pthread.h>
 
 #define MAXBUFF 1024
+
+int socketDescriptor;
+struct sockaddr_in remoteSin;
+socklen_t fromlen = sizeof(remoteSin);
+
+void* receiveMessages(void* arg) {
+    char message[MAXBUFF];
+    while (1) {
+        recvfrom(socketDescriptor, message, MAXBUFF, 0, (struct sockaddr *)&remoteSin, &fromlen);
+        printf("Received: %s", message);
+    }
+    return NULL;
+}
 
 int main(int argc, char *argv[]) {
     if (argc != 4) {
@@ -13,9 +27,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    int socketDescriptor;
-    struct sockaddr_in remoteSin, localSin;
-    socklen_t fromlen = sizeof(remoteSin);
     char *remoteHostName = argv[2];
     char *remotePort = argv[3];
 
@@ -26,18 +37,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    // Setup local address
-    localSin.sin_family = AF_INET;
-    localSin.sin_port = htons(atoi(argv[1]));
-    localSin.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    // Bind to the local address
-    if (bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(localSin)) == -1) {
-        perror("Failed to bind socket");
-        exit(1);
-    }
-
-    // Get the remote host information
+    // Setup remote address
     struct addrinfo hints, *result;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -47,25 +47,22 @@ int main(int argc, char *argv[]) {
         printf("Could not find host\n");
         exit(1);
     }
-
-    // Setup remote address
     memcpy(&remoteSin, result->ai_addr, result->ai_addrlen);
 
-    char message[MAXBUFF];
+    pthread_t receiveThread;
+    if (pthread_create(&receiveThread, NULL, receiveMessages, NULL) != 0) {
+        perror("Failed to create receive thread");
+        exit(1);
+    }
 
+    char message[MAXBUFF];
     while (1) {
         printf("Type a message: ");
         fgets(message, MAXBUFF, stdin);
-
-        // Send the message to the remote host
         sendto(socketDescriptor, message, strlen(message), 0, (struct sockaddr *)&remoteSin, sizeof(remoteSin));
-
-        // Receive a message from the remote host
-        recvfrom(socketDescriptor, message, MAXBUFF, 0, (struct sockaddr *)&remoteSin, &fromlen);
-
-        printf("Received: %s", message);
     }
 
+    pthread_join(receiveThread, NULL);
     close(socketDescriptor);
 
     return 0;
