@@ -9,10 +9,10 @@ EXECUTABLE = s-talk
 all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) -pthread $(LDFLAGS) -o $@ $^
 
 %.o: %.c
-	$(CC) -pthread $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -f $(filter-out list.o, $(OBJ)) $(EXECUTABLE)

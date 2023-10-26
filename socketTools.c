@@ -92,5 +92,7 @@ void printChatDetails(){
 }
 
 void closeSocket(){
-    closeSocket(SOCKET_FILE_DESCRIPTOR);
+    printf("Closing Socket\033[0m: ");
+    close(SOCKET_FILE_DESCRIPTOR);
+    printf("\033[92mSucessfull\n\033[0m");
 }

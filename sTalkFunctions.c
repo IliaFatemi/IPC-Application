@@ -57,16 +57,17 @@ void *keyboard(){
             if(chatEnded(message)){
                 CHAT_ACTIVE = false;
                 TYPING_MSG = false;
+                WAITING_TO_RECEIVE = true;
                 printf("\033[91m\nYou terminated the session :(\n");
                 List_append(localMsgList, message);
                 pthread_mutex_unlock(&syncLocalMutex);
                 pthread_cond_signal(&syncLocalCond);
+                pthread_cancel(threads[3]);
                 memset(message, NULL_CHAR, MAX_BUFF);
                 close(SOCKET_FILE_DESCRIPTOR);
                 deallocate();
                 pthread_cancel(threads[1]);
                 pthread_cancel(threads[2]);
-                pthread_cancel(threads[3]);
                 pthread_exit(EXIT_STAT_SUCCESS);
                 return NULL;
             }else{
@@ -155,8 +156,8 @@ void *receive(){
                 memset(message, NULL_CHAR, MAX_BUFF);
                 deallocate();
                 close(SOCKET_FILE_DESCRIPTOR);
+                pthread_cancel(threads[0]);
                 pthread_cancel(threads[2]);
-                pthread_cancel(threads[3]);
                 pthread_exit(EXIT_STAT_SUCCESS);
             }else{
                 List_append(remoteMsgList, message);
