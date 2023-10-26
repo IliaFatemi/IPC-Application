@@ -13,7 +13,6 @@
 extern struct sockaddr_in localSin, remoteSin;
 extern char *HOSTNAME;
 extern int socketDescriptor;
-extern bool CHAT_ACTIVE;
 
 void *keyboard();
 void *screen();

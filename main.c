@@ -55,6 +55,25 @@ int main(int argc, char *argv[]){
     }
     printf("Host found\n\n");
 
+    struct hostent *host;
+    host = gethostbyname(argv[2]);
+    if(!host) {
+        printf("Host is not found. \n");
+        exit(1);
+    }
+
+    struct in_addr** addrList = (struct in_addr**)host->h_addr_list;
+    char* target;
+    for(int i = 0; addrList[i] != NULL; i++){
+        target = inet_ntoa(*addrList[i]);
+        break;
+    }
+    if(inet_aton(target, &remoteSin.sin_addr) == 0){
+        printf("inet_aton failed. \n");
+        exit(1);
+    }
+
+
     initializeThreads();
     
     close(socketDescriptor);

@@ -43,13 +43,13 @@ void *keyboard(){
         while(TYPING_MSG){
             pthread_testcancel();
             fgets(message,MAXBUFF,stdin);
-            // if (message != ""){
-            //     printf("\033[A\033[K\033[B");
-            // }
-            printf("\033[32mYou: %s", message);
+            if (message != ""){
+                printf("\033[A\033[K\033[B");
+            }
+            printf("\033[32mYou: \033[0m%s", message);
             if(message[0] == '!'){
                 CHAT_ACTIVE=false;
-                printf("You have ended the session.\n");
+                printf("\nYou have ended the session.\n");
                 
                 List_append(localMsgList,message);
                 TYPING_MSG = false;
@@ -109,7 +109,7 @@ void *screen(){
 void *send_msg(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     char temp[MAXBUFF];
-
+    bool exit = false;
     while(CHAT_ACTIVE){
         pthread_testcancel();
         pthread_mutex_lock(&syncLocalMutex);
@@ -153,7 +153,7 @@ void *receive(){
                 //33 ascii for !
                 //2 b/c newline is counted 
                 CHAT_ACTIVE = false;
-                printf("Your partner has ended the session.\n");
+                printf("%s has ended the chat.\n", HOSTNAME);
                 pthread_cancel(threads[3]);
                 memset(msg,'\0',MAXBUFF);
                 close(socketDescriptor);
