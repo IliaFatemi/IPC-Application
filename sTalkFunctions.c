@@ -148,18 +148,14 @@ void *receive(){
             pthread_testcancel();
             recvfrom(socketDescriptor, message, MAXBUFF, 0,(struct sockaddr*)&remoteSin, &remoteSize);
             if(chatEnded(message)) { 
-
                 CHAT_ACTIVE = false;
                 printf("\033[31m%s has ended the chat.\n", HOSTNAME);
                 pthread_cancel(threads[1]);
                 memset(message, '\0', MAXBUFF);
-
                 deallocate();
                 close(socketDescriptor);
-
                 pthread_cancel(threads[2]);
                 pthread_cancel(threads[1]);
-
                 pthread_exit(0);
             }else{
                 List_append(remoteMsgList, message);
@@ -195,7 +191,6 @@ void deallocate(){
     pthread_mutex_unlock(&syncRemoteMutex);
     pthread_mutex_destroy(&syncLocalMutex);
     pthread_mutex_destroy(&syncRemoteMutex);
-
 }
 
 bool chatEnded(char message[]){
