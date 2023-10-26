@@ -14,21 +14,22 @@ int main(int argc, char *argv[]){
     argv[2] = remote machine name
     argv[3] = remote port
     */
+   
     HOSTNAME = argv[2];
 
     if (argc != 4){
-        printf("Insufficient arguments give.\n");
+        printf("\033[91mInsufficient arguments give.\033[0m\n");
         exit(1);
     }
 
-    printf("Creating socket....\n");
+    printf("Creating socket: ");
     socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
 
     if (socketDescriptor == -1){
-        printf("Failed to create socket\n");
+        printf("\033[91mFailed to create socket\033[0m\n");
         exit(1);
     }
-    printf("socket created\n\n");
+    printf("\033[92msocket created\033[0m\n");
 
     //local socket setup
     localSin.sin_family = AF_INET;
@@ -39,28 +40,29 @@ int main(int argc, char *argv[]){
     remoteSin.sin_family = AF_INET;
     remoteSin.sin_port = htons(atoi(argv[3]));
 
-    printf("Binding...\n");
+    printf("Binding: ");
     // int bind_ = bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(struct sockaddr_in));
     if(bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(struct sockaddr_in))){
-        printf("Failed to bind socket\n");
+        printf("\033[91mFailed to bind socket\033[0m\n");
+        printf("Closing socket: \033[0m");
+        close(socketDescriptor);
+        printf("\033[91mSocket closed\n\n");
         exit(1);
     }
-    printf("Binding succesfull\n\n");
+    printf("\033[92mBinding succesfull\033[0m\n");
 
     //search for host name
-    printf("Looking for %s...\n", HOSTNAME);
-    if(!gethostbyname(HOSTNAME)){
-        printf("Could not find host\n");
-        exit(1);
-    }
-    printf("Host found\n\n");
-
+    printf("Looking for \033[1;94m%s\033[0m: ", HOSTNAME);
     struct hostent *host;
-    host = gethostbyname(argv[2]);
-    if(!host) {
-        printf("Host is not found. \n");
+    host = gethostbyname(HOSTNAME);
+    if(!host){
+        printf("\033[91mFAILED TO FIND HOST\033[0m\n");
+        printf("Closing socket: \033[0m");
+        close(socketDescriptor);
+        printf("\033[91mSocket closed\n\n");
         exit(1);
     }
+    printf("\033[92mHost found\033[0m\n\n");
 
     struct in_addr** addrList = (struct in_addr**)host->h_addr_list;
     char* target;
@@ -70,6 +72,9 @@ int main(int argc, char *argv[]){
     }
     if(inet_aton(target, &remoteSin.sin_addr) == 0){
         printf("inet_aton failed. \n");
+        printf("Closing socket: \033[0m");
+        close(socketDescriptor);
+        printf("\033[91mSocket closed\n\n");
         exit(1);
     }
 
@@ -82,21 +87,17 @@ int main(int argc, char *argv[]){
     //     ssize_t bytesReceived = recvfrom(socketDescriptor, buffer, sizeof(buffer), 0, (struct sockaddr*)&senderAddress, &addrLen);
 
     //     if (bytesReceived > 0) {
-    //         // You've received a message from the other person, which means they have connected.
-    //         // You can now process the message or notify the user about the connection.
     //         printf("\033[1;34m%s \033[0mhas connected: %s\n", HOSTNAME, buffer);
-    //         break; // You can exit this loop after detecting the connection.
-    //     }
+    //         break;
+    //     }w
     // }
 
     printf("=================================================\n");
     printf("START Chatting\n\n");
 
-
-
     initializeThreads();
+    printf("Closing socket: \033[0m");
     close(socketDescriptor);
-    printf("Closing socket\n");
-
+    printf("\033[92mSuccesfull\033[0m\n\n");
     return 0;
 }

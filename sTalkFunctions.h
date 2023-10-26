@@ -9,6 +9,7 @@
 
 #define MAXBUFF 1024
 #define NTHREADS 4
+#define NULLCHAR '\0'
 
 extern struct sockaddr_in localSin, remoteSin;
 extern char *HOSTNAME;
@@ -21,5 +22,6 @@ void *receive();
 void initializeThreads();
 void deallocate();
 bool chatEnded(char message[]);
+bool listNotEmpty();
 
 #endif

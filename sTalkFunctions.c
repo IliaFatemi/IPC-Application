@@ -9,6 +9,15 @@
 #include <netdb.h>
 #include <unistd.h>
 
+char *HOSTNAME;
+
+int socketDescriptor;
+
+bool CHAT_ACTIVE = true;
+bool WAITING_TO_RECEIVE = true;
+bool TYPING_MSG = true;
+
+struct sockaddr_in localSin, remoteSin;
 
 //Synchronization 
 pthread_mutex_t syncLocalMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -22,15 +31,7 @@ pthread_t threads[NTHREADS];
 List* localMsgList;
 List* remoteMsgList;
 
-struct sockaddr_in localSin, remoteSin;
-
 socklen_t remoteSize = sizeof(remoteSin);
-
-char *HOSTNAME;
-int socketDescriptor;
-bool CHAT_ACTIVE = true;
-bool WAITING_TO_RECEIVE = true;
-bool TYPING_MSG = true;
 
 
 void *keyboard(){
@@ -49,15 +50,15 @@ void *keyboard(){
             if (message != ""){
                 printf("\033[F\033[K");
             }
-            printf("\033[32mYou: \033[0m%s", message);
+            printf("\033[31m\033[93mYou: \033[0m%s", message);
             if(chatEnded(message)){
                 CHAT_ACTIVE = false;
                 TYPING_MSG = false;
-                printf("\033[31m\nYou terminated the session :(\n");
+                printf("\033[91m\nYou terminated the session :(\n");
                 List_append(localMsgList, message);
                 pthread_mutex_unlock(&syncLocalMutex);
                 pthread_cond_signal(&syncLocalCond);
-                memset(message, '\0', MAXBUFF);
+                memset(message, NULLCHAR, MAXBUFF);
                 close(socketDescriptor);
                 deallocate();
                 pthread_cancel(threads[1]);
@@ -78,9 +79,8 @@ void *keyboard(){
 
 
 void *screen(){
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     while(CHAT_ACTIVE){
-        
         pthread_testcancel();
         pthread_mutex_lock(&syncRemoteMutex);
         while(WAITING_TO_RECEIVE){
@@ -92,7 +92,7 @@ void *screen(){
             for(int i = 0; i < List_count(remoteMsgList); i++){
                 pthread_testcancel();
                 List_first(remoteMsgList);
-                printf("\033[34m%s: \033[0m%s", HOSTNAME, (char*)List_remove(remoteMsgList));
+                printf("\033[94m%s: \033[0m%s", HOSTNAME, (char*)List_remove(remoteMsgList));
             }
             pthread_mutex_unlock(&syncRemoteMutex);
             pthread_cond_signal(&syncRemoteCond);
@@ -115,14 +115,12 @@ void *send_msg(){
         }
         while(!TYPING_MSG){
             pthread_testcancel();
-            if(List_first(localMsgList) != NULL && List_curr(localMsgList) != NULL){
-                if(List_count(localMsgList) > 0){
-                    for(int i = 0; i < List_count(localMsgList); i++){
-                        pthread_testcancel();
-                        List_first(localMsgList);
-                        strcpy(send_message,(char*) List_remove(localMsgList));
-                        sendto(socketDescriptor,send_message,MAXBUFF,0,(struct sockaddr *)&remoteSin, sizeof(struct sockaddr_in));
-                    }
+            if(listNotEmpty()){
+                for(int i = 0; i < List_count(localMsgList); i++){
+                    pthread_testcancel();
+                    List_first(localMsgList);
+                    strcpy(send_message,(char*) List_remove(localMsgList));
+                    sendto(socketDescriptor, send_message, MAXBUFF, 0, (struct sockaddr *) &remoteSin, sizeof(struct sockaddr_in));
                 }
             }
             pthread_mutex_unlock(&syncLocalMutex);
@@ -149,9 +147,9 @@ void *receive(){
             recvfrom(socketDescriptor, message, MAXBUFF, 0,(struct sockaddr*)&remoteSin, &remoteSize);
             if(chatEnded(message)) { 
                 CHAT_ACTIVE = false;
-                printf("\033[31m%s has ended the chat.\n", HOSTNAME);
+                printf("\033[1;94m%s\033[91mhas ended the chat.\033[0m\n", HOSTNAME);
                 pthread_cancel(threads[1]);
-                memset(message, '\0', MAXBUFF);
+                memset(message, NULLCHAR, MAXBUFF);
                 deallocate();
                 close(socketDescriptor);
                 pthread_cancel(threads[2]);
@@ -195,4 +193,8 @@ void deallocate(){
 
 bool chatEnded(char message[]){
     return message[0] == '!';
+}
+
+bool listNotEmpty(){
+    return List_first(localMsgList) != NULL && List_curr(localMsgList) != NULL && List_count(localMsgList) > 0;
 }
