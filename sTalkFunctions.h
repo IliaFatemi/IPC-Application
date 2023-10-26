@@ -15,11 +15,13 @@ extern char *HOSTNAME;
 extern int socketDescriptor;
 extern bool CHAT_ACTIVE;
 
-void *keyboard();
-void *screen();
-void *send_msg();
-void *receive();
-void initializeThreads();
-void deallocate();
+void *keyInput();
+void *sendData();
+void *awaitUDP();
+void *printScreen();
+void init();
+void joinThreads();
+void freeVar();
+void freeFnc();
 
 #endif

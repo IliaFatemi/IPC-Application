@@ -54,7 +54,9 @@ int main(int argc, char *argv[]){
     }
     printf("Host found\n\n");
 
-    initializeThreads();
+    init();
+    joinThreads();
+    
     close(socketDescriptor);
 
 

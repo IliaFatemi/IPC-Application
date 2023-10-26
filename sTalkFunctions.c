@@ -9,164 +9,197 @@
 #include <netdb.h>
 #include <unistd.h>
 
-//Synchronization 
-pthread_mutex_t syncLocalMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t syncLocalCond;
- 
-pthread_mutex_t syncRemoteMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t syncRemoteCond;
-
-pthread_t threads[NTHREADS];
-
-List* localMsgList;
-List* remoteMsgList;
+List* localList;
+List* remoteList;
 
 struct sockaddr_in localSin, remoteSin;
+
+
+int MAXBUFFER = 1024;
 char *HOSTNAME;
 int socketDescriptor;
-bool CHAT_ACTIVE = true;
-bool WAITING_TO_RECEIVE = true;
-bool TYPING_MSG = true;
+bool CHAT_ACTIVE;
+
+pthread_mutex_t localMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t remoteMutex = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t localCond;
+pthread_cond_t remoteCond;
 
 
-void *keyboard(){
+pthread_t threadList[4]; // 4 threads
+
+bool active = true;
+
+bool emptySend = true;
+bool emptyPrint = true;
+
+
+void freeFnc(void *p){
+    p = NULL;
+}
+
+void freeVar(){
+    List_free(localList,freeFnc);
+    List_free(remoteList,freeFnc);
+    pthread_mutex_unlock(&localMutex);
+    pthread_mutex_unlock(&remoteMutex);
+    pthread_mutex_destroy(&localMutex);
+    pthread_mutex_destroy(&remoteMutex);
+
+}
+// Add message to localList
+void* keyInput(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
-    char message[MAXBUFF];
-    while(CHAT_ACTIVE){
+    char msg[MAXBUFFER];
+    while(active){
         pthread_testcancel();
-        pthread_mutex_lock(&syncLocalMutex);
-        //wait to send message
-        while(!TYPING_MSG){
+        pthread_mutex_lock(&localMutex);
+        while(!emptySend){
             pthread_testcancel();
-            pthread_cond_wait(&syncLocalCond,&syncLocalMutex);
+            pthread_cond_wait(&localCond,&localMutex);
         } 
-        while(TYPING_MSG){
+        while(emptySend){
             pthread_testcancel();
-            fgets(message, MAXBUFF, stdin);
-            printf("\033[32mYou: \033[0m%s\n", message);
-            if(message[0] == '!'){
-                printf("\033[0mTerminating chat....\n");
-                CHAT_ACTIVE = false;
-            }
-            List_append(localMsgList, message);
-            memset(message,'\0',MAXBUFF);
-            TYPING_MSG = false;
-            pthread_mutex_unlock(&syncLocalMutex);
-            pthread_cond_signal(&syncLocalCond);
-        }
-        
-    }
-    pthread_exit(NULL);
-}
+            fgets(msg,MAXBUFFER,stdin);
+            if(msg[0] == 33 && strlen(msg) == 2){
+                active=false;
+                printf("You have ended the session.\n");
+                
+                List_append(localList,msg);
+                emptySend = false;
 
+                //Make sure ! is sent over
+                pthread_mutex_unlock(&localMutex);
+                pthread_cond_signal(&localCond);
+                sleep(1); 
+                pthread_cancel(threadList[1]);
+                sleep(1);
+                memset(msg,'\0',MAXBUFFER);
+                close(socketDescriptor);
 
-void *screen(){
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
-    while(CHAT_ACTIVE){
-        
-        pthread_testcancel();
-        pthread_mutex_lock(&syncRemoteMutex);
-        while(WAITING_TO_RECEIVE){
-            pthread_testcancel();
-            pthread_cond_wait(&syncRemoteCond,&syncRemoteMutex);
-        }
-        while(!WAITING_TO_RECEIVE){
-            pthread_testcancel();
-            while(List_count(remoteMsgList) > 0){
-                pthread_testcancel();
-                List_first(remoteMsgList);
-                printf("Partner: %s",(char*)List_remove(remoteMsgList));
+                freeVar();
+                pthread_cancel(threadList[2]);
+                pthread_cancel(threadList[3]);
+                pthread_exit(0);
+                return NULL;
+            }else{
+                List_append(localList,msg);
+                emptySend = false;
+                pthread_mutex_unlock(&localMutex);
+                pthread_cond_signal(&localCond);
             }
-            pthread_mutex_unlock(&syncRemoteMutex);
-            pthread_cond_signal(&syncRemoteCond);
-            WAITING_TO_RECEIVE = true;
         }
     }
     pthread_exit(NULL);
 }
 
-
-void *send_msg(){
+// Remove message from localList and send through socket
+void* sendData(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
-    char temp[MAXBUFF];
+    char temp[MAXBUFFER];
     bool exit = false;
-    while(CHAT_ACTIVE){
+    while(active){
         pthread_testcancel();
-        pthread_mutex_lock(&syncLocalMutex);
-        while(TYPING_MSG){
+        pthread_mutex_lock(&localMutex);
+        while(emptySend){
             pthread_testcancel();
-            pthread_cond_wait(&syncLocalCond,&syncLocalMutex);
+            pthread_cond_wait(&localCond,&localMutex);
         }
-        while(!TYPING_MSG){
+        while(!emptySend){
             pthread_testcancel();
-            while(List_count(localMsgList) > 0 && List_first(localMsgList) != NULL && List_curr(localMsgList) != NULL) {
+            while(List_count(localList) > 0 && List_first(localList) != NULL && List_curr(localList) != NULL) {
                 pthread_testcancel();
-                List_first(localMsgList);
-                strcpy(temp,(char*) List_remove(localMsgList));
-                sendto(socketDescriptor,temp,MAXBUFF,0,(struct sockaddr *)&remoteSin, sizeof(struct sockaddr_in));
+                List_first(localList);
+                strcpy(temp,(char*) List_remove(localList));
+                sendto(socketDescriptor,temp,MAXBUFFER,0,(struct sockaddr *)&remoteSin, sizeof(struct sockaddr_in));
             }
-            pthread_mutex_unlock(&syncLocalMutex);
-            pthread_cond_signal(&syncLocalCond);
-            TYPING_MSG = true;
+            pthread_mutex_unlock(&localMutex);
+            pthread_cond_signal(&localCond);
+            emptySend = true;
         }
     }
     pthread_exit(NULL);
 }
 
-
-void *receive(){
+// Receive message from socket and add to remoteList
+void* awaitUDP(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
-    char msg[MAXBUFF];
+    char msg[MAXBUFFER];
     socklen_t fromlen = sizeof(remoteSin);
-    while(CHAT_ACTIVE){
+    while(active){
         // printf("Await UDP Start\n");
         pthread_testcancel();
-        pthread_mutex_lock(&syncRemoteMutex);
-        while(!WAITING_TO_RECEIVE){
+        pthread_mutex_lock(&remoteMutex);
+        while(!emptyPrint){
             pthread_testcancel();
-            pthread_cond_wait(&syncRemoteCond,&syncRemoteMutex);
+            pthread_cond_wait(&remoteCond,&remoteMutex);
         }
-        while(WAITING_TO_RECEIVE){
+        while(emptyPrint){
             pthread_testcancel();
-            recvfrom(socketDescriptor,msg,MAXBUFF,0,(struct sockaddr*)&remoteSin,&fromlen);
+            recvfrom(socketDescriptor,msg,MAXBUFFER,0,(struct sockaddr*)&remoteSin,&fromlen);
             if(msg[0] == 33 && strlen(msg) == 2) { 
                 //33 ascii for !
                 //2 b/c newline is counted 
-                CHAT_ACTIVE = false;
+                active = false;
                 printf("Your partner has ended the session.\n");
-                pthread_cancel(threads[3]);
-                memset(msg,'\0',MAXBUFF);
+                pthread_cancel(threadList[3]);
+                memset(msg,'\0',MAXBUFFER);
                 close(socketDescriptor);
 
-                // freeVar();
+                freeVar();
 
-                pthread_cancel(threads[0]);
-                pthread_cancel(threads[1]);
+                pthread_cancel(threadList[0]);
+                pthread_cancel(threadList[1]);
 
                 pthread_exit(0);
             }else{
-                List_append(remoteMsgList,msg);
-                WAITING_TO_RECEIVE = false;
-                pthread_mutex_unlock(&syncRemoteMutex);
-                pthread_cond_signal(&syncRemoteCond);
+                List_append(remoteList,msg);
+                emptyPrint = false;
+                pthread_mutex_unlock(&remoteMutex);
+                pthread_cond_signal(&remoteCond);
             }
         }
     }
     pthread_exit(NULL);
 }
+// Remove message from remoteList and print
+void* printScreen(){
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
+    while(active){
+        
+        pthread_testcancel();
+        pthread_mutex_lock(&remoteMutex);
+        while(emptyPrint){
+            pthread_testcancel();
+            pthread_cond_wait(&remoteCond,&remoteMutex);
+        }
+        while(!emptyPrint){
+            pthread_testcancel();
+            while(List_count(remoteList) > 0){
+                pthread_testcancel();
+                List_first(remoteList);
+                printf("Partner: %s",(char*)List_remove(remoteList));
+            }
+            pthread_mutex_unlock(&remoteMutex);
+            pthread_cond_signal(&remoteCond);
+            emptyPrint = true;
+        }
+    }
+    pthread_exit(NULL);
+}
 
+void init(){
+    localList = List_create();
+    remoteList = List_create();
+    pthread_create(&threadList[0],NULL,keyInput,NULL);
+    pthread_create(&threadList[1],NULL,sendData,NULL);
+    pthread_create(&threadList[2],NULL,awaitUDP,NULL);
+    pthread_create(&threadList[3],NULL,printScreen,NULL);
+}
 
-void initializeThreads(){
-    localMsgList = List_create();
-    remoteMsgList = List_create();
-
-    pthread_create(&threads[0], NULL, keyboard, NULL);
-    pthread_create(&threads[1], NULL, screen, NULL);
-    pthread_create(&threads[2], NULL, send_msg, NULL);
-    pthread_create(&threads[3], NULL, receive, NULL);
-
-    pthread_join(threads[0], NULL);
-    pthread_join(threads[1], NULL);
-    pthread_join(threads[2], NULL);
-    pthread_join(threads[3], NULL);
+void joinThreads(){
+    for(int i = 0; i < 4; i ++){
+        pthread_join(threadList[i],NULL);
+    }
 }
