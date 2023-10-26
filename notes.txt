@@ -1,6 +1,0 @@
-fgets(msg,MAXBUFFER,stdin);
-            if (msg != ""){
-            printf("\033[A\033[K\033[B");
-
-            }
-            printf("You: %s", msg);

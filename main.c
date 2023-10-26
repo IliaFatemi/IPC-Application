@@ -73,10 +73,30 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
+    // char buffer[1024];
+    // struct sockaddr_in senderAddress;
+    // socklen_t addrLen = sizeof(senderAddress);
+
+    // // printf("Waiting %s to connect....\n", HOSTNAME);
+    // while (1) {
+    //     ssize_t bytesReceived = recvfrom(socketDescriptor, buffer, sizeof(buffer), 0, (struct sockaddr*)&senderAddress, &addrLen);
+
+    //     if (bytesReceived > 0) {
+    //         // You've received a message from the other person, which means they have connected.
+    //         // You can now process the message or notify the user about the connection.
+    //         printf("\033[1;34m%s \033[0mhas connected: %s\n", HOSTNAME, buffer);
+    //         break; // You can exit this loop after detecting the connection.
+    //     }
+    // }
+
+    printf("=================================================\n");
+    printf("START Chatting\n\n");
+
+
 
     initializeThreads();
-    
     close(socketDescriptor);
+    printf("Closing socket\n");
 
     return 0;
 }

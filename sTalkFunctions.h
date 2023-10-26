@@ -20,5 +20,6 @@ void *send_msg();
 void *receive();
 void initializeThreads();
 void deallocate();
+bool chatEnded(char message[]);
 
 #endif
