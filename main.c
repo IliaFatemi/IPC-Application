@@ -8,68 +8,54 @@
 #include <netdb.h>
 #include <unistd.h>
 
-int main(int argc, char *argv[]){
-    /*
-    argv[1] = local port
-    argv[2] = remote machine name
-    argv[3] = remote port
-    */
-    HOSTNAME = argv[2];
-
-    if (argc != 4){
-        printf("Insufficient arguments give.\n");
+int main(int argc, char *argv[]){	
+    //==== Start Setup Socket connection ====
+    socketDescriptor = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+    if(socketDescriptor == -1) {
+        printf("Socket creation failed.\n");
         exit(1);
     }
+    int portLocal, portRemote;
+    portLocal = atoi(argv[1]);
+    portRemote = atoi(argv[3]);
 
-    printf("Creating socket....\n");
-    socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
-
-    if (socketDescriptor == -1){
-        printf("Failed to create socket\n");
-        exit(1);
-    }
-    printf("socket created\n\n");
-
-    //local socket setup
+    //Init local socket
     localSin.sin_family = AF_INET;
-    localSin.sin_port = htons(atoi(argv[1]));
+    localSin.sin_port = htons(portLocal);
     localSin.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    //remote socket setup
+    int b = bind(socketDescriptor, (struct sockaddr* )&localSin, sizeof(struct sockaddr_in));
+    if(b == -1){
+        printf("Socket bind failed.\n");
+        exit(1);
+    }
+    //Init remote socket
     remoteSin.sin_family = AF_INET;
-    remoteSin.sin_port = htons(atoi(argv[3]));
+    remoteSin.sin_port = htons(portRemote);
 
-    printf("Binding...\n");
-    if(bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(struct sockaddr_in)) == -1){
-        printf("Failed to bind socket\n");
+    struct hostent *host;
+    host = gethostbyname(argv[2]);
+    if(!host) {
+        printf("Host is not found. \n");
         exit(1);
     }
-    printf("Binding succesfull\n\n");
 
-    //search for host name
-    printf("Looking for %s...\n", HOSTNAME);
-    if(!gethostbyname(HOSTNAME)){
-        printf("Could not find host\n");
+    struct in_addr** addrList = (struct in_addr**)host->h_addr_list;
+    char* target;
+    for(int i = 0; addrList[i] != NULL; i++){
+        target = inet_ntoa(*addrList[i]);
+        break;
+    }
+    if(inet_aton(target, &remoteSin.sin_addr) == 0){
+        printf("inet_aton failed. \n");
         exit(1);
     }
-    printf("Host found\n\n");
+    //==== End Setup Socket connection ====
+
 
     init();
     joinThreads();
-    
+    printf("Thank you for using s-talk!\n");
     close(socketDescriptor);
-
-
-    // while(CHATTING){
-    //     fgets(msg,MAXBUFF,stdin);
-
-    //     printf("sendto\n");
-    //     sendto(socketDescriptor, msg,MAXBUFF,0,(struct sockaddr *)&remoteSin, sizeof(struct sockaddr_in));
-    //     socklen_t fromlen = sizeof(remoteSin);
-    //     printf("receive\n");
-    //     recvfrom(socketDescriptor,msg,MAXBUFF,0,(struct sockaddr*)&remoteSin,&fromlen);
-    //     printf("Partner: %s",msg);
-    // }
-
     return 0;
 }
