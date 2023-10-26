@@ -37,4 +37,6 @@ When chatting, the sender and receiver are color coded to differentiate the send
 >receiver is indicated as <b>blue.</b><br>
 
 ## 3. Terminate Chat
-To Terminate the chat, the user or the remote user can type <b>`!`</b> to terminate the chat.
+To Terminate the chat, the user or the remote user can type <b>`!`</b> to terminate the chat.<br>
+This action will terminate the pprogram on both ends of the user and remote user.
+
