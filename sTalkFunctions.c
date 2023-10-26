@@ -63,23 +63,24 @@ void *keyboard(){
 void *screen(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     while(CHAT_ACTIVE){
+        
         pthread_testcancel();
         pthread_mutex_lock(&syncRemoteMutex);
         while(WAITING_TO_RECEIVE){
             pthread_testcancel();
-            pthread_cond_wait(&syncRemoteCond,&syncRemoteMutex);
+            pthread_cond_wait(&syncLocalCond,&syncRemoteMutex);
         }
         while(!WAITING_TO_RECEIVE){
             pthread_testcancel();
             while(List_count(remoteMsgList) > 0){
                 pthread_testcancel();
                 List_first(remoteMsgList);
-                printf("\033[34m%s: \033%s\n", HOSTNAME, (char*)List_remove(remoteMsgList));
+                printf("Partner: %s",(char*)List_remove(remoteMsgList));
             }
+            pthread_mutex_unlock(&syncRemoteMutex);
+            pthread_cond_signal(&syncLocalCond);
+            WAITING_TO_RECEIVE = true;
         }
-        pthread_mutex_unlock(&syncRemoteMutex);
-        pthread_cond_signal(&syncRemoteCond);
-        WAITING_TO_RECEIVE = true;
     }
     pthread_exit(NULL);
 }
@@ -114,9 +115,10 @@ void *send_msg(){
 
 void *receive(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
-    char received_message[MAXBUFF];
-    socklen_t remote_length = sizeof(remoteSin);
+    char msg[MAXBUFF];
+    socklen_t fromlen = sizeof(remoteSin);
     while(CHAT_ACTIVE){
+        // printf("Await UDP Start\n");
         pthread_testcancel();
         pthread_mutex_lock(&syncRemoteMutex);
         while(!WAITING_TO_RECEIVE){
@@ -125,11 +127,28 @@ void *receive(){
         }
         while(WAITING_TO_RECEIVE){
             pthread_testcancel();
-            recvfrom(socketDescriptor, received_message, MAXBUFF, 0, (struct sockaddr*)&remoteSin, &remote_length);
-            List_append(remoteMsgList, received_message);
-            WAITING_TO_RECEIVE = false;
-            pthread_mutex_unlock(&syncRemoteMutex);
-            pthread_cond_signal(&syncRemoteCond);
+            recvfrom(socketDescriptor,msg,MAXBUFF,0,(struct sockaddr*)&remoteSin,&fromlen);
+            if(msg[0] == 33 && strlen(msg) == 2) { 
+                //33 ascii for !
+                //2 b/c newline is counted 
+                CHAT_ACTIVE = false;
+                printf("Your partner has ended the session.\n");
+                pthread_cancel(threads[3]);
+                memset(msg,'\0',MAXBUFF);
+                close(socketDescriptor);
+
+                // freeVar();
+
+                pthread_cancel(threads[0]);
+                pthread_cancel(threads[1]);
+
+                pthread_exit(0);
+            }else{
+                List_append(remoteMsgList,msg);
+                WAITING_TO_RECEIVE = false;
+                pthread_mutex_unlock(&syncRemoteMutex);
+                pthread_cond_signal(&syncRemoteCond);
+            }
         }
     }
     pthread_exit(NULL);
