@@ -33,7 +33,7 @@ The program takes takes <b>4 arguments</b> in the following format:
 When chatting, the sender and receiver are color coded to differentiate the sender from the receiver.<br>
 
 >[!NOTE]
->sender is indicated as <b>green.</b><br>
+>sender is indicated as <b>orange.</b><br>
 >receiver is indicated as <b>blue.</b><br>
 
 ## 3. Terminate Chat
