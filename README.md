@@ -9,7 +9,7 @@ make all
 ```
 
 ## 2. Run program
->[!NOTE]
+>[!IMPORTANT]
 ><b>Note: Both machines must be on the same network in order to connect. The two machines IPV4 addresses must be on the same network subnet.</b>
 
 The program takes takes <b>4 arguments</b> in the following format:
@@ -32,5 +32,6 @@ The program takes takes <b>4 arguments</b> in the following format:
 ## 3. Start chatting 
 When chatting, the sender and receiver are color coded to differentiate the sender from the receiver.<br>
 
+>[!NOTE]
 >sender is indicated as <b>green.</b><br>
 >receiver is indicated as <b>blue.</b><br>
