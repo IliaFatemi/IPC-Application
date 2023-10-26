@@ -68,7 +68,7 @@ void *screen(){
         pthread_mutex_lock(&syncRemoteMutex);
         while(WAITING_TO_RECEIVE){
             pthread_testcancel();
-            pthread_cond_wait(&syncLocalCond,&syncRemoteMutex);
+            pthread_cond_wait(&syncRemoteCond,&syncRemoteMutex);
         }
         while(!WAITING_TO_RECEIVE){
             pthread_testcancel();
@@ -78,7 +78,7 @@ void *screen(){
                 printf("Partner: %s",(char*)List_remove(remoteMsgList));
             }
             pthread_mutex_unlock(&syncRemoteMutex);
-            pthread_cond_signal(&syncLocalCond);
+            pthread_cond_signal(&syncRemoteCond);
             WAITING_TO_RECEIVE = true;
         }
     }
@@ -88,7 +88,8 @@ void *screen(){
 
 void *send_msg(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
-    char msg_content[MAXBUFF];
+    char temp[MAXBUFF];
+    bool exit = false;
     while(CHAT_ACTIVE){
         pthread_testcancel();
         pthread_mutex_lock(&syncLocalMutex);
@@ -98,11 +99,11 @@ void *send_msg(){
         }
         while(!TYPING_MSG){
             pthread_testcancel();
-            while(List_count(localMsgList) > 0 && List_first(localMsgList) != NULL && List_curr(localMsgList) != NULL){
+            while(List_count(localMsgList) > 0 && List_first(localMsgList) != NULL && List_curr(localMsgList) != NULL) {
                 pthread_testcancel();
                 List_first(localMsgList);
-                strcpy(msg_content, (char*)List_remove(localMsgList));
-                sendto(socketDescriptor, msg_content, MAXBUFF, 0, (struct sockaddr*)&remoteSin, sizeof(struct sockaddr_in));
+                strcpy(temp,(char*) List_remove(localMsgList));
+                sendto(socketDescriptor,temp,MAXBUFF,0,(struct sockaddr *)&remoteSin, sizeof(struct sockaddr_in));
             }
             pthread_mutex_unlock(&syncLocalMutex);
             pthread_cond_signal(&syncLocalCond);
