@@ -1,15 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include "list.h"
-#include "sTalkFunctions.h"
-#include <string.h>
-#include <pthread.h>
-#include <arpa/inet.h> 
-#include <netdb.h>
-#include <unistd.h>
-
-
 //Synchronization 
 pthread_mutex_t syncLocalMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t syncLocalCond;
@@ -36,45 +24,26 @@ void *keyboard(){
     while(CHAT_ACTIVE){
         pthread_testcancel();
         pthread_mutex_lock(&syncLocalMutex);
+        //wait to send message
         while(!TYPING_MSG){
             pthread_testcancel();
             pthread_cond_wait(&syncLocalCond,&syncLocalMutex);
         } 
         while(TYPING_MSG){
             pthread_testcancel();
-            fgets(message,MAXBUFF,stdin);
-            // if (message != ""){
-            //     printf("\033[A\033[K\033[B");
-            // }
-            printf("\033[32mYou: %s", message);
+            fgets(message, MAXBUFF, stdin);
+            printf("\033[32mYou: \033[0m%s\n", message);
             if(message[0] == '!'){
-                CHAT_ACTIVE=false;
-                printf("You have ended the session.\n");
-                
-                List_append(localMsgList,message);
-                TYPING_MSG = false;
-
-                //Make sure ! is sent over
-                pthread_mutex_unlock(&syncLocalMutex);
-                pthread_cond_signal(&syncLocalCond);
-                sleep(1); 
-                pthread_cancel(threads[1]);
-                sleep(1);
-                memset(message,'\0',MAXBUFF);
-                close(socketDescriptor);
-
-                // freeVar();
-                pthread_cancel(threads[2]);
-                pthread_cancel(threads[3]);
-                pthread_exit(0);
-                return NULL;
-            }else{
-                List_append(localMsgList,message);
-                TYPING_MSG = false;
-                pthread_mutex_unlock(&syncLocalMutex);
-                pthread_cond_signal(&syncLocalCond);
+                printf("\033[0mTerminating chat....\n");
+                CHAT_ACTIVE = false;
             }
+            List_append(localMsgList, message);
+            memset(message,'\0',MAXBUFF);
+            TYPING_MSG = false;
+            pthread_mutex_unlock(&syncLocalMutex);
+            pthread_cond_signal(&syncLocalCond);
         }
+        
     }
     pthread_exit(NULL);
 }
@@ -95,7 +64,7 @@ void *screen(){
             while(List_count(remoteMsgList) > 0){
                 pthread_testcancel();
                 List_first(remoteMsgList);
-                printf("\033[34m%s: \033[0m%s", HOSTNAME, (char*)List_remove(remoteMsgList));
+                printf("Partner: %s",(char*)List_remove(remoteMsgList));
             }
             pthread_mutex_unlock(&syncRemoteMutex);
             pthread_cond_signal(&syncRemoteCond);
@@ -109,7 +78,7 @@ void *screen(){
 void *send_msg(){
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,NULL);
     char temp[MAXBUFF];
-
+    bool exit = false;
     while(CHAT_ACTIVE){
         pthread_testcancel();
         pthread_mutex_lock(&syncLocalMutex);
@@ -190,3 +159,135 @@ void initializeThreads(){
     pthread_join(threads[2], NULL);
     pthread_join(threads[3], NULL);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#include "sTalkFunctions.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <pthread.h>
+#include <arpa/inet.h> 
+#include <netdb.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[]){
+    /*
+    argv[1] = local port
+    argv[2] = remote machine name
+    argv[3] = remote port
+    */
+    HOSTNAME = argv[2];
+
+    if (argc != 4){
+        printf("Insufficient arguments give.\n");
+        exit(1);
+    }
+
+    printf("Creating socket....\n");
+    socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
+
+    int portLocal, portRemote;
+    portLocal = atoi(argv[1]);
+    portRemote = atoi(argv[3]);
+
+    if (socketDescriptor == -1){
+        printf("Failed to create socket\n");
+        exit(1);
+    }
+    printf("socket created\n\n");
+
+    //local socket setup
+    localSin.sin_family = AF_INET;
+    localSin.sin_port = htons(portLocal);
+    localSin.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    //remote socket setup
+    remoteSin.sin_family = AF_INET;
+    remoteSin.sin_port = htons(portRemote);
+
+    printf("Binding...\n");
+    int bind_ = bind(socketDescriptor, (struct sockaddr *)&localSin, sizeof(struct sockaddr_in));
+    if(bind_){
+        printf("Failed to bind socket\n");
+        exit(1);
+    }
+    printf("Binding succesfull\n\n");
+
+    //search for host name
+    printf("Looking for %s...\n", HOSTNAME);
+    if(!gethostbyname(HOSTNAME)){
+        printf("Could not find host\n");
+        exit(1);
+    }
+    printf("Host found\n\n");
+
+    init();
+    joinThreads();
+    
+    close(socketDescriptor);
+
+    return 0;
+}
+
+
+
+
+
+#ifndef STALKFUNCTIONS_H
+#define STALKFUNCTIONS_H
+
+#include <stdio.h>
+#include <stdbool.h>
+#include <arpa/inet.h>
+#include <pthread.h>
+#include "list.h"
+
+#define MAXBUFF 1024
+#define NTHREADS 4
+
+extern struct sockaddr_in localSin, remoteSin;
+extern char *HOSTNAME;
+extern int socketDescriptor;
+extern bool CHAT_ACTIVE;
+
+void *keyboard();
+void *screen();
+void *send_msg();
+void *receive();
+void initializeThreads();
+void deallocate();
+
+#endif
