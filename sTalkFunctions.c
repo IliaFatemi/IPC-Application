@@ -53,7 +53,7 @@ void *keyboard(){
             if (message != ""){
                 printf("\033[F\033[K");
             }
-            printf("\033[31m\033[93mYou: \033[0m%s", message);
+            printf("\033[92mYou: \033[0m%s", message);
             if(chatEnded(message)){
                 CHAT_ACTIVE = false;
                 TYPING_MSG = false;
@@ -151,7 +151,7 @@ void *receive(){
             recvfrom(SOCKET_FILE_DESCRIPTOR, message, MAX_BUFF, MSG_DEFAULT_FLAG, (struct sockaddr*)&REMOTE_SIN, &remoteSize);
             if(chatEnded(message)) { 
                 CHAT_ACTIVE = false;
-                printf("\033[1;94m%s\033[91m has ended the chat.\033[0m\n", REMOTE_HOSTNAME);
+                printf("\n\033[1;94m%s\033[91m has ended the chat.\033[0m\n", REMOTE_HOSTNAME);
                 pthread_cancel(threads[1]);
                 memset(message, NULL_CHAR, MAX_BUFF);
                 deallocate();
