@@ -70,12 +70,11 @@ void *keyboard(){
                 pthread_cancel(threads[2]);
                 pthread_exit(EXIT_STAT_SUCCESS);
                 return NULL;
-            }else{
-                List_append(localMsgList,message);
-                TYPING_MSG = false;
-                pthread_mutex_unlock(&syncLocalMutex);
-                pthread_cond_signal(&syncLocalCond);
             }
+            List_append(localMsgList,message);
+            TYPING_MSG = false;
+            pthread_mutex_unlock(&syncLocalMutex);
+            pthread_cond_signal(&syncLocalCond);
         }
     }
     pthread_exit(EXIT_STAT_UNKNOWN);
@@ -159,12 +158,11 @@ void *receive(){
                 pthread_cancel(threads[0]);
                 pthread_cancel(threads[2]);
                 pthread_exit(EXIT_STAT_SUCCESS);
-            }else{
-                List_append(remoteMsgList, message);
-                WAITING_TO_RECEIVE = false;
-                pthread_mutex_unlock(&syncRemoteMutex);
-                pthread_cond_signal(&syncRemoteCond);
             }
+            List_append(remoteMsgList, message);
+            WAITING_TO_RECEIVE = false;
+            pthread_mutex_unlock(&syncRemoteMutex);
+            pthread_cond_signal(&syncRemoteCond);
         }
     }
     pthread_exit(EXIT_STAT_UNKNOWN);
