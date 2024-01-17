@@ -26,21 +26,16 @@ extern char *LOCAL_PORT, *REMOTE_PORT;
 
 extern int SOCKET_FILE_DESCRIPTOR;
 
+// Function prototypes for thread functions
 void *keyboard();
 void *screen();
 void *send_msg();
 void *receive();
 
-// Start the 4 threads and initialize lists
+// More function prototypes for initialization and cleanup
 void initializeThreads();
-
-// Free up lists and destroy mutex
 void deallocate();
-
-// check if message contains !
 bool chatEnded(char message[]);
-
-//Check if list is empty
 bool emptyList(List* list);
 
 #endif
