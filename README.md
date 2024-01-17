@@ -1,4 +1,4 @@
-# Assignment 2 Instructions
+# IPC-Application Instructions
 
 ## 1. Compile Program
 <b>When compiling, an executable called `s-talk` will be created.</b><br>
